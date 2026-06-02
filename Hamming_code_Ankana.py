@@ -1,4 +1,5 @@
 #Hamming_code
+#Ankana_dey
 
 def get_parity_bits(m):
     r = 0
