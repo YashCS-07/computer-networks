@@ -1,55 +1,165 @@
-# Changes in line num 4,5,6 Complete rewrite of xor() – Fixed critical bug and made it efficient using zip and generator expression.
-# Changes in line num 8 to 25 Major rewrite of mod2div() – Used list instead of string concatenation, removed redundant XOR with zeros, better loop structure.
+"""
+CRC (Cyclic Redundancy Check)
+
+Features:
+- CRC Encoding
+- CRC Decoding
+- Input Validation
+- Automatic Error Demonstration
+"""
+
+from typing import Tuple
+
 
 def xor(a: str, b: str) -> str:
-    """XOR two binary strings of equal length"""
-    return ''.join('0' if x == y else '1' for x, y in zip(a, b))
+    """
+    Perform XOR between two binary strings
+    (ignoring the first bit as required in CRC division).
+    """
+    return ''.join(
+        '0' if a[i] == b[i] else '1'
+        for i in range(1, len(b))
+    )
+
+
+def validate_binary(bits: str, name: str) -> None:
+    """
+    Validate binary input.
+    """
+    if not bits:
+        raise ValueError(f"{name} cannot be empty.")
+
+    if any(bit not in "01" for bit in bits):
+        raise ValueError(f"{name} must contain only 0 and 1.")
+
+    if name == "Generator":
+        if bits[0] != "1":
+            raise ValueError("Generator polynomial must start with 1.")
+        if len(bits) < 2:
+            raise ValueError("Generator must contain at least two bits.")
+
 
 def mod2div(dividend: str, divisor: str) -> str:
-    """Perform modulo-2 division and return remainder"""
-    divisor_len = len(divisor)
-    temp = list(dividend[:divisor_len])  # Use list for mutability
+    """
+    Perform Modulo-2 Division and return the CRC remainder.
+    """
+    pick = len(divisor)
+    temp = dividend[:pick]
 
-    for i in range(divisor_len, len(dividend)):
-        if temp[0] == '1':
-            temp = list(xor(''.join(temp), divisor))
+    while pick < len(dividend):
+
+        if temp[0] == "1":
+            temp = xor(divisor, temp) + dividend[pick]
         else:
-            temp = temp[1:]  # Just shift (no need to XOR with 0s)      
-        temp.append(dividend[i])
+            temp = xor("0" * pick, temp) + dividend[pick]
 
-    # Final remainder
-    if temp[0] == '1':
-        temp = list(xor(''.join(temp), divisor))
+        pick += 1
+
+    # Final division
+    if temp[0] == "1":
+        temp = xor(divisor, temp)
     else:
-        temp = temp[1:]
-    return ''.join(temp)
+        temp = xor("0" * pick, temp)
 
-def encode_crc(data: str, generator: str):
-    """Generate CRC remainder and codeword"""
-    n = len(generator) - 1
-    appended_data = data + '0' * n
+    return temp
+
+
+def encode_crc(data: str, generator: str) -> Tuple[str, str]:
+    """
+    Generate CRC remainder and codeword.
+    """
+    validate_binary(data, "Data")
+    validate_binary(generator, "Generator")
+
+    appended_data = data + "0" * (len(generator) - 1)
+
     remainder = mod2div(appended_data, generator)
+
     codeword = data + remainder
+
     return remainder, codeword
 
+
 def decode_crc(codeword: str, generator: str) -> bool:
-    """Check if received codeword is valid"""
+    """
+    Return True if no error is detected.
+    """
+    validate_binary(codeword, "Codeword")
+    validate_binary(generator, "Generator")
+
     remainder = mod2div(codeword, generator)
+
     return '1' not in remainder
-    
-print("----- CRC CHECKSUM PROGRAM -----")
 
-data = input("Enter data bits: ").strip()
-generator = input("Enter generator bits: ").strip()
-remainder, codeword = encode_crc(data, generator)
 
-print("\nSender Side")
-print("CRC Remainder :", remainder)
-print("Codeword      :", codeword)
-print("\nReceiver Side (Original)")
-print("No Error Detected" if decode_crc(codeword, generator) else "Error Detected")
+def introduce_error(codeword: str, position: int) -> str:
+    """
+    Flip one bit of the codeword.
+    """
+    if not (0 <= position < len(codeword)):
+        raise IndexError("Bit position out of range.")
 
-# Test with error
-corrupted = codeword[:-1] + ('1' if codeword[-1] == '0' else '0')
-print("\nCorrupted Codeword :", corrupted)
-print("No Error Detected" if decode_crc(corrupted, generator) else "Error Detected")
+    corrupted = list(codeword)
+
+    corrupted[position] = (
+        '1' if corrupted[position] == '0' else '0'
+    )
+
+    return ''.join(corrupted)
+
+
+def main() -> None:
+
+    print("=" * 50)
+    print("        CRC (Cyclic Redundancy Check)")
+    print("=" * 50)
+
+    try:
+
+        data = input("Enter Data Bits      : ").strip()
+        generator = input("Enter Generator Bits : ").strip()
+
+        remainder, codeword = encode_crc(data, generator)
+
+        print("\n----------- Sender Side -----------")
+        print(f"Original Data      : {data}")
+        print(f"CRC Remainder      : {remainder}")
+        print(f"Generated Codeword : {codeword}")
+
+        print("\n----------- Receiver Side -----------")
+
+        received = input(
+            "Enter Received Codeword (Press Enter to use original): "
+        ).strip()
+
+        if not received:
+            received = codeword
+
+        if decode_crc(received, generator):
+            print("Result : No Error Detected")
+        else:
+            print("Result : Error Detected")
+
+        print("\n------ Automatic Error Demonstration ------")
+
+        position = len(codeword) // 2
+
+        corrupted = introduce_error(codeword, position)
+
+        print(f"Bit Flipped Position : {position}")
+        print(f"Corrupted Codeword   : {corrupted}")
+
+        if decode_crc(corrupted, generator):
+            print("Result : No Error Detected")
+        else:
+            print("Result : Error Detected")
+
+    except ValueError as e:
+        print("\nInput Error:", e)
+
+    except Exception as e:
+        print("\nUnexpected Error:", e)
+
+
+if __name__ == "__main__":
+    main()
